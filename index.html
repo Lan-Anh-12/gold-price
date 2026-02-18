@@ -4,51 +4,76 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bảng Giá Vàng Tự Động 2026</title>
+
     <style>
-       
-        body { font-family: sans-serif; display: flex; justify-content: center; background: #f4f4f4; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 350px; margin-top: 50px; }
-        h2 { color: #d4af37; text-align: center; }
-        .price-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
-        .label { font-weight: bold; }
-        .value { color: #e74c3c; font-weight: bold; }
-        .update-time { font-size: 0.8em; color: #888; text-align: center; margin-top: 15px; }
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            background: #f4f4f4;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 350px;
+            margin-top: 50px;
+        }
+
+        h2 {
+            color: #d4af37;
+            text-align: center;
+        }
+
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .label {
+            font-weight: bold;
+        }
+
+        .value {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .update-time {
+            font-size: 0.8em;
+            color: #888;
+            text-align: center;
+            margin-top: 15px;
+        }
     </style>
 </head>
 <body>
 
 <div class="card">
     <h2>Giá Vàng SJC Hôm Nay</h2>
+
     <div class="price-row">
         <span class="label">Mua vào:</span>
         <span class="value" id="buy-price">Đang tải...</span>
     </div>
+
     <div class="price-row">
         <span class="label">Bán ra:</span>
         <span class="value" id="sell-price">Đang tải...</span>
     </div>
-    <p class="update-time">Cập nhật tự động bởi GitHub Actions: <br><span id="last-update">-</span></p>
+
+    <p class="update-time">
+        Cập nhật tự động bởi GitHub Actions:<br>
+        <span id="last-update">-</span>
+    </p>
 </div>
 
-<script>
-    
-    async function updateGold() {
-        try {
-          
-            const response = await fetch('./data.json?v=' + Math.random());
-            const data = await response.json();
-            
-            document.getElementById('buy-price').innerText = data.sjc_buy + " Triệu";
-            document.getElementById('sell-price').innerText = data.sjc_sell + " Triệu";
-            document.getElementById('last-update').innerText = data.updated_at;
-        } catch (error) {
-            console.error("Lỗi khi lấy dữ liệu:", error);
-        }
-    }
-
-
-    updateGold();
-</script>
+<!-- Import file JS -->
+<script src="script.js"></script>
 
 </body>
 </html>
