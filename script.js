@@ -1,9 +1,11 @@
 async function loadGoldPrice() {
-    const response = await fetch('./data.json');
-    const data = await response.json();
-    
-    document.getElementById('buy-price').innerText = data.sjc_buy;
-    document.getElementById('sell-price').innerText = data.sjc_sell;
+    try {
+        const response = await fetch('./data.json?v=' + Date.now());
+        if (!response.ok) throw new Error("File empty");
+        const data = await response.json();
+
+    }
 }
 
 loadGoldPrice();
+
