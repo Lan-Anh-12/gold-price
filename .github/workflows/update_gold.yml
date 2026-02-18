@@ -21,7 +21,7 @@ jobs:
 
       - name: Fetch Gold Price
         run: |
-          curl -L -s https://api.example.com/gold-price > data.json
+          curl -L -s https://raw.githubusercontent.com/netsoft-hcm/api-gold/main/data.json > data.json
 
       - name: Commit and Push
         run: |
