@@ -6,7 +6,7 @@ on:
     - cron: '0 * * * *'
 
 jobs:
-  build:
+  update-gold:
     runs-on: ubuntu-latest
 
     permissions:
@@ -18,14 +18,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create data.json
+      - name: Create data.json safely
         run: |
-          echo '{"sjc_buy": "89.0", "sjc_sell": "91.0", "updated_at": "'$(date +'%d/%m/%Y %H:%M')'"}' > data.json
+          cat <<EOF > data.json
+          {
+            "sjc_buy": "89.0",
+            "sjc_sell": "91.0",
+            "updated_at": "$(date +'%d/%m/%Y %H:%M')"
+          }
+          EOF
 
-      - name: Commit and Push if changed
+      - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add data.json
 
