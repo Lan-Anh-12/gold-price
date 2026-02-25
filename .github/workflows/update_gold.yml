@@ -3,7 +3,7 @@ name: Update Gold Price
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 * * * *'   # mỗi giờ
 
 jobs:
   update-gold:
@@ -18,12 +18,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create data.json safely
+      - name: Fetch gold price from BTMC API
         run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+
+          RESPONSE=$(curl -s "http://api.btmc.vn/api/BTMCAPI/getpricebtmc?key=3kd8ub1llcg9t45hnoh8hmn7t5kc2v")
+
+          # Lấy giá SJC (vàng miếng SJC)
+          SJC_BUY=$(echo "$RESPONSE" | jq -r '.Data[] | select(.Type=="SJC") | .Buy')
+          SJC_SELL=$(echo "$RESPONSE" | jq -r '.Data[] | select(.Type=="SJC") | .Sell')
+
           cat <<EOF > data.json
           {
-            "sjc_buy": "89.0",
-            "sjc_sell": "91.0",
+            "sjc_buy": "$SJC_BUY",
+            "sjc_sell": "$SJC_SELL",
             "updated_at": "$(date +'%d/%m/%Y %H:%M')"
           }
           EOF
