@@ -1,4 +1,4 @@
-name: Update Gold Price
+name: Update Gold Price (vang.today)
 
 on:
   workflow_dispatch:
@@ -18,21 +18,56 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch gold price from BTMC API
+      - name: Fetch & compare SJC gold price
         run: |
           sudo apt-get update
           sudo apt-get install -y jq curl
 
-          RESPONSE=$(curl -s "http://api.btmc.vn/api/BTMCAPI/getpricebtmc?key=3kd8ub1llcg9t45hnoh8hmn7t5kc2v")
+          TODAY_RESPONSE=$(curl -s "https://www.vang.today/api/prices?type=SJL1L10")
+          HISTORY_RESPONSE=$(curl -s "https://www.vang.today/api/prices?type=SJL1L10&days=2")
 
-          # Lấy giá SJC (vàng miếng SJC)
-          SJC_BUY=$(echo "$RESPONSE" | jq -r '.Data[] | select(.Type=="SJC") | .Buy')
-          SJC_SELL=$(echo "$RESPONSE" | jq -r '.Data[] | select(.Type=="SJC") | .Sell')
+          # Giá hôm nay
+          TODAY_BUY=$(echo "$TODAY_RESPONSE" | jq -r '.data[0].buy // empty')
+          TODAY_SELL=$(echo "$TODAY_RESPONSE" | jq -r '.data[0].sell // empty')
+
+          # Giá hôm qua (item cuối cùng)
+          YESTERDAY_BUY=$(echo "$HISTORY_RESPONSE" | jq -r '.data[-1].buy // empty')
+          YESTERDAY_SELL=$(echo "$HISTORY_RESPONSE" | jq -r '.data[-1].sell // empty')
+
+          # Nếu API lỗi → không commit
+          if [ -z "$TODAY_BUY" ] || [ -z "$YESTERDAY_BUY" ]; then
+            echo "❌ Failed to fetch gold price"
+            exit 0
+          fi
+
+          # So sánh
+          BUY_DIFF=$((TODAY_BUY - YESTERDAY_BUY))
+          SELL_DIFF=$((TODAY_SELL - YESTERDAY_SELL))
+
+          if [ "$BUY_DIFF" -gt 0 ]; then
+            BUY_TREND="up"
+          elif [ "$BUY_DIFF" -lt 0 ]; then
+            BUY_TREND="down"
+          else
+            BUY_TREND="same"
+          fi
 
           cat <<EOF > data.json
           {
-            "sjc_buy": "$SJC_BUY",
-            "sjc_sell": "$SJC_SELL",
+            "type": "SJC",
+            "today": {
+              "buy": $TODAY_BUY,
+              "sell": $TODAY_SELL
+            },
+            "yesterday": {
+              "buy": $YESTERDAY_BUY,
+              "sell": $YESTERDAY_SELL
+            },
+            "change": {
+              "buy_diff": $BUY_DIFF,
+              "sell_diff": $SELL_DIFF,
+              "trend": "$BUY_TREND"
+            },
             "updated_at": "$(date +'%d/%m/%Y %H:%M')"
           }
           EOF
@@ -47,6 +82,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Update gold price"
+            git commit -m "Update SJC gold price"
             git push origin HEAD
           fi
