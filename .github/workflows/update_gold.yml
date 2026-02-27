@@ -3,7 +3,7 @@ name: Update Gold Price (vang.today)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'   # mỗi giờ
+    - cron: '0 0 * * *'   # mỗi giờ
 
 jobs:
   update-gold:
