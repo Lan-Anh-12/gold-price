@@ -1,29 +1,30 @@
 async function loadGoldPrice() {
+    const buyEl = document.getElementById('buy-price');
+    const sellEl = document.getElementById('sell-price');
+    const updateEl = document.getElementById('last-update');
+
     try {
+        // Thêm timestamp Date.now() để trình duyệt luôn tải file mới nhất từ GitHub
         const response = await fetch('./data.json?v=' + Date.now());
 
-        if (!response.ok) {
-            throw new Error("Không thể tải data.json");
-        }
+        if (!response.ok) throw new Error("Không thể tải data.json");
 
         const data = await response.json();
 
-        document.getElementById('buy-price').textContent =
-            data.sjc_buy ? data.sjc_buy + " Triệu" : "Không có dữ liệu";
+        // Cập nhật giao diện
+        buyEl.textContent = data.sjc_buy ? `${data.sjc_buy} Triệu` : "---";
+        sellEl.textContent = data.sjc_sell ? `${data.sjc_sell} Triệu` : "---";
+        updateEl.textContent = data.updated_at || "Không rõ";
 
-        document.getElementById('sell-price').textContent =
-            data.sjc_sell ? data.sjc_sell + " Triệu" : "Không có dữ liệu";
-
-        document.getElementById('last-update').textContent =
-            data.updated_at || "Không rõ";
+        console.log("Dữ liệu mới nhất:", data);
 
     } catch (error) {
-        console.error("Lỗi khi lấy dữ liệu:", error);
-        document.getElementById('buy-price').textContent = "Lỗi";
-        document.getElementById('sell-price').textContent = "Lỗi";
-        document.getElementById('last-update').textContent = "Lỗi";
+        console.error("Lỗi:", error);
+        buyEl.textContent = "Lỗi tải";
+        sellEl.textContent = "Lỗi tải";
+        updateEl.textContent = "Vui lòng thử lại sau";
     }
 }
 
-// Chạy khi trang load xong
+// Chạy khi trang web tải xong
 document.addEventListener("DOMContentLoaded", loadGoldPrice);
