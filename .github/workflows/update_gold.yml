@@ -1,5 +1,4 @@
 name: Update Gold Price (SJC)
-
 on:
   workflow_dispatch:
   schedule:
@@ -11,26 +10,21 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Fetch and Force Update
         run: |
-          # 1. Lấy dữ liệu từ API
+          # Lấy dữ liệu từ API
           RESPONSE=$(curl -s -H "User-Agent: Mozilla/5.0" "https://www.vang.today/api/prices?type=SJL1L10&limit=1")
-          
-          # 2. Lấy giá (Nếu rỗng thì để mặc định 0)
           BUY=$(echo "$RESPONSE" | jq -r '.data[0].buy // "0"')
           SELL=$(echo "$RESPONSE" | jq -r '.data[0].sell // "0"')
-
-          # 3. Chuyển sang đơn vị Triệu (89000000 -> 89.0)
+          
+          # PHẢI CÓ GIÂY (%S) ĐỂ NỘI DUNG FILE LUÔN KHÁC NHAU
+          UPDATED_AT=$(date -d '+7 hours' +'%d/%m/%Y %H:%M:%S')
+          
           SJC_BUY=$(echo "scale=1; $BUY / 1000000" | bc)
           SJC_SELL=$(echo "scale=1; $SELL / 1000000" | bc)
-
-          # 4. QUAN TRỌNG: Thêm giây (%S) để nội dung file luôn khác biệt
-          UPDATED_AT=$(date -d '+7 hours' +'%d/%m/%Y %H:%M:%S')
-
-          # 5. Ghi đè file data.json
+          
+          # Ghi đè file data.json
           echo "{\"sjc_buy\": \"$SJC_BUY\", \"sjc_sell\": \"$SJC_SELL\", \"updated_at\": \"$UPDATED_AT\"}" > data.json
           
       - name: Commit and Push
@@ -38,6 +32,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data.json
-          # Commit kèm mốc thời gian chi tiết
-          git commit -m "Update Gold Price: $(date -d '+7 hours' +'%H:%M:%S')" || exit 0
+          # Commit kèm mốc thời gian chi tiết để ép Git thực hiện
+          git commit -m "Force Update: $(date -d '+7 hours' +'%H:%M:%S')" || exit 0
           git push origin HEAD
