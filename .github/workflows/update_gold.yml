@@ -1,37 +1,58 @@
 name: Update Gold Price (SJC)
+
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *' # Chạy mỗi tiếng 1 lần
+    - cron: '0 * * * *' # Chạy tự động mỗi tiếng một lần
 
 jobs:
   update-gold:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Fetch and Force Update
         run: |
-          # Lấy dữ liệu từ API
-          RESPONSE=$(curl -s -H "User-Agent: Mozilla/5.0" "https://www.vang.today/api/prices?type=SJL1L10&limit=1")
-          BUY=$(echo "$RESPONSE" | jq -r '.data[0].buy // "0"')
-          SELL=$(echo "$RESPONSE" | jq -r '.data[0].sell // "0"')
+          # 1. Cài đặt công cụ tính toán số thập phân (quan trọng để không bị ra số 0)
+          sudo apt-get install -y bc jq
+
+          # 2. Lấy dữ liệu từ API (Sử dụng thêm cờ -L để bám theo chuyển hướng nếu có)
+          RESPONSE=$(curl -s -L -H "User-Agent: Mozilla/5.0" "https://www.vang.today/api/prices?type=SJL1L10&limit=1")
           
-          # PHẢI CÓ GIÂY (%S) ĐỂ NỘI DUNG FILE LUÔN KHÁC NHAU
+          # 3. Trích xuất giá thô (ví dụ: 89000000)
+          RAW_BUY=$(echo "$RESPONSE" | jq -r '.data[0].buy // "0"')
+          RAW_SELL=$(echo "$RESPONSE" | jq -r '.data[0].sell // "0"')
+
+          # 4. Kiểm tra nếu giá lấy về hợp lệ (> 0) thì mới thực hiện chia
+          if [ "$RAW_BUY" != "0" ] && [ "$RAW_BUY" != "null" ]; then
+            # Chia cho 1,000,000 và lấy 1 chữ số thập phân (ví dụ: 89.5)
+            SJC_BUY=$(echo "scale=1; $RAW_BUY / 1000000" | bc)
+            SJC_SELL=$(echo "scale=1; $RAW_SELL / 1000000" | bc)
+          else
+            # Nếu API lỗi hoặc không có giá, giữ nguyên để báo hiệu
+            SJC_BUY="Đang cập nhật"
+            SJC_SELL="Đang cập nhật"
+          fi
+
+          # 5. Lấy thời gian VN (+7) kèm SỐ GIÂY để ép Git phải Push
           UPDATED_AT=$(date -d '+7 hours' +'%d/%m/%Y %H:%M:%S')
-          
-          SJC_BUY=$(echo "scale=1; $BUY / 1000000" | bc)
-          SJC_SELL=$(echo "scale=1; $SELL / 1000000" | bc)
-          
-          # Ghi đè file data.json
+
+          # 6. Ghi đè file data.json (đảm bảo đúng cấu trúc hiển thị của bạn)
           echo "{\"sjc_buy\": \"$SJC_BUY\", \"sjc_sell\": \"$SJC_SELL\", \"updated_at\": \"$UPDATED_AT\"}" > data.json
           
+          # In ra log để bạn tự kiểm tra trong tab Actions
+          echo "KẾT QUẢ FILE JSON:"
+          cat data.json
+
       - name: Commit and Push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data.json
-          # Commit kèm mốc thời gian chi tiết để ép Git thực hiện
-          git commit -m "Force Update: $(date -d '+7 hours' +'%H:%M:%S')" || exit 0
+          # Commit kèm mốc giây để tạo sự khác biệt hoàn toàn
+          git commit -m "Auto Update: $(date -d '+7 hours' +'%H:%M:%S')" || exit 0
           git push origin HEAD
