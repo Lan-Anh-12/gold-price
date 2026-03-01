@@ -3,7 +3,7 @@ name: Update Gold Price (SJC)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *' # Tự động chạy mỗi tiếng một lần
+    - cron: '0 0 * * *' # Tự động chạy 12 tiếng một lần
 
 jobs:
   update-gold:
