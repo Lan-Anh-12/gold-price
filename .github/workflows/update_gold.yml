@@ -3,7 +3,7 @@ name: Update Gold Price (SJC)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *' # Chạy tự động mỗi tiếng 1 lần
+    - cron: '0 * * * *' # Tự động chạy mỗi tiếng một lần
 
 jobs:
   update-gold:
@@ -17,18 +17,19 @@ jobs:
 
       - name: Fetch and Force Update
         run: |
-          # Cài đặt công cụ tính toán và xử lý JSON
+          # 1. Cài đặt công cụ tính toán số thập phân
           sudo apt-get install -y bc jq
 
-          # 1. Gọi API lấy giá vàng
+          # 2. Gọi API lấy giá vàng (Dùng link chuẩn của bạn)
           RESPONSE=$(curl -s -L -H "User-Agent: Mozilla/5.0" "https://www.vang.today/api/prices?type=SJL1L10")
           
-          # 2. SỬA LỖI TẠI ĐÂY: Lấy trực tiếp từ Object (Bỏ .data[0])
+          # 3. TRÍCH XUẤT GIÁ: Bỏ .data[0] vì API trả về Object trực tiếp
           RAW_BUY=$(echo "$RESPONSE" | jq -r '.buy // "0"')
           RAW_SELL=$(echo "$RESPONSE" | jq -r '.sell // "0"')
 
-          # 3. Chuyển đổi sang đơn vị Triệu (Ví dụ: 184000000 / 1000000 = 184.0)
+          # 4. TÍNH TOÁN: Chia cho 1,000,000 để ra đơn vị Triệu
           if [ "$RAW_BUY" != "0" ] && [ "$RAW_BUY" != "null" ]; then
+            # scale=1 để lấy 1 chữ số sau dấu phẩy (VD: 184.0)
             SJC_BUY=$(echo "scale=1; $RAW_BUY / 1000000" | bc)
             SJC_SELL=$(echo "scale=1; $RAW_SELL / 1000000" | bc)
           else
@@ -36,14 +37,14 @@ jobs:
             SJC_SELL="---"
           fi
 
-          # 4. Lấy thời gian VN (+7) kèm số giây để ép Git Push bản mới
+          # 5. LẤY THỜI GIAN: Thêm số giây (%S) để ép GitHub phải ghi đè file
           UPDATED_AT=$(date -d '+7 hours' +'%d/%m/%Y %H:%M:%S')
 
-          # 5. Ghi file data.json
+          # 6. GHI FILE: Đúng cấu trúc mà script.js đang đọc
           echo "{\"sjc_buy\": \"$SJC_BUY\", \"sjc_sell\": \"$SJC_SELL\", \"updated_at\": \"$UPDATED_AT\"}" > data.json
           
-          # In ra để bạn soi log trong tab Actions nếu vẫn lỗi
-          echo "Check file content:"
+          # In ra Log để kiểm tra kết quả ngay trong tab Actions
+          echo "Noi dung file JSON vua tao:"
           cat data.json
 
       - name: Commit and Push
@@ -51,6 +52,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data.json
-          # Commit kèm mốc giây để nội dung luôn khác biệt
+          # Commit kèm mốc thời gian chi tiết
           git commit -m "Update Price: $(date -d '+7 hours' +'%H:%M:%S')" || exit 0
           git push origin HEAD
