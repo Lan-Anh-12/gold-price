@@ -3,7 +3,7 @@ name: Update Gold Price (SJC)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *' # Chạy tự động mỗi tiếng một lần
+    - cron: '0 * * * *' # Chạy mỗi tiếng 1 lần
 
 jobs:
   update-gold:
@@ -17,35 +17,33 @@ jobs:
 
       - name: Fetch and Force Update
         run: |
-          # 1. Cài đặt công cụ tính toán số thập phân (quan trọng để không bị ra số 0)
+          # Cài đặt công cụ tính toán
           sudo apt-get install -y bc jq
 
-          # 2. Lấy dữ liệu từ API (Sử dụng thêm cờ -L để bám theo chuyển hướng nếu có)
-          RESPONSE=$(curl -s -L -H "User-Agent: Mozilla/5.0" "https://www.vang.today/api/prices?type=SJL1L10&limit=1")
+          # 1. Gọi API (Lấy chính xác link bạn đang dùng)
+          RESPONSE=$(curl -s -L -H "User-Agent: Mozilla/5.0" "https://www.vang.today/api/prices?type=SJL1L10")
           
-          # 3. Trích xuất giá thô (ví dụ: 89000000)
-          RAW_BUY=$(echo "$RESPONSE" | jq -r '.data[0].buy // "0"')
-          RAW_SELL=$(echo "$RESPONSE" | jq -r '.data[0].sell // "0"')
+          # 2. SỬA LỖI Ở ĐÂY: Lấy trực tiếp từ Object (không dùng .data[0])
+          # Dựa trên JSON bạn gửi: .buy và .sell nằm ngay ngoài cùng
+          RAW_BUY=$(echo "$RESPONSE" | jq -r '.buy // "0"')
+          RAW_SELL=$(echo "$RESPONSE" | jq -r '.sell // "0"')
 
-          # 4. Kiểm tra nếu giá lấy về hợp lệ (> 0) thì mới thực hiện chia
+          # 3. Tính toán sang đơn vị Triệu (Ví dụ: 184000000 -> 184.0)
           if [ "$RAW_BUY" != "0" ] && [ "$RAW_BUY" != "null" ]; then
-            # Chia cho 1,000,000 và lấy 1 chữ số thập phân (ví dụ: 89.5)
             SJC_BUY=$(echo "scale=1; $RAW_BUY / 1000000" | bc)
             SJC_SELL=$(echo "scale=1; $RAW_SELL / 1000000" | bc)
           else
-            # Nếu API lỗi hoặc không có giá, giữ nguyên để báo hiệu
             SJC_BUY="Đang cập nhật"
             SJC_SELL="Đang cập nhật"
           fi
 
-          # 5. Lấy thời gian VN (+7) kèm SỐ GIÂY để ép Git phải Push
+          # 4. Lấy thời gian VN (+7) kèm số giây để ép Git Push
           UPDATED_AT=$(date -d '+7 hours' +'%d/%m/%Y %H:%M:%S')
 
-          # 6. Ghi đè file data.json (đảm bảo đúng cấu trúc hiển thị của bạn)
+          # 5. Ghi file data.json đúng cấu trúc script.js cần
           echo "{\"sjc_buy\": \"$SJC_BUY\", \"sjc_sell\": \"$SJC_SELL\", \"updated_at\": \"$UPDATED_AT\"}" > data.json
           
-          # In ra log để bạn tự kiểm tra trong tab Actions
-          echo "KẾT QUẢ FILE JSON:"
+          echo "Nội dung file JSON thực tế:"
           cat data.json
 
       - name: Commit and Push
@@ -53,6 +51,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data.json
-          # Commit kèm mốc giây để tạo sự khác biệt hoàn toàn
-          git commit -m "Auto Update: $(date -d '+7 hours' +'%H:%M:%S')" || exit 0
+          git commit -m "Update Price: $(date -d '+7 hours' +'%H:%M:%S')" || exit 0
           git push origin HEAD
