@@ -3,7 +3,7 @@ name: Update Gold Price (SJC)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *' # Chạy mỗi tiếng 1 lần
+    - cron: '0 * * * *' # Chạy tự động mỗi tiếng 1 lần
 
 jobs:
   update-gold:
@@ -17,33 +17,33 @@ jobs:
 
       - name: Fetch and Force Update
         run: |
-          # Cài đặt công cụ tính toán
+          # Cài đặt công cụ tính toán và xử lý JSON
           sudo apt-get install -y bc jq
 
-          # 1. Gọi API (Lấy chính xác link bạn đang dùng)
+          # 1. Gọi API lấy giá vàng
           RESPONSE=$(curl -s -L -H "User-Agent: Mozilla/5.0" "https://www.vang.today/api/prices?type=SJL1L10")
           
-          # 2. SỬA LỖI Ở ĐÂY: Lấy trực tiếp từ Object (không dùng .data[0])
-          # Dựa trên JSON bạn gửi: .buy và .sell nằm ngay ngoài cùng
+          # 2. SỬA LỖI TẠI ĐÂY: Lấy trực tiếp từ Object (Bỏ .data[0])
           RAW_BUY=$(echo "$RESPONSE" | jq -r '.buy // "0"')
           RAW_SELL=$(echo "$RESPONSE" | jq -r '.sell // "0"')
 
-          # 3. Tính toán sang đơn vị Triệu (Ví dụ: 184000000 -> 184.0)
+          # 3. Chuyển đổi sang đơn vị Triệu (Ví dụ: 184000000 / 1000000 = 184.0)
           if [ "$RAW_BUY" != "0" ] && [ "$RAW_BUY" != "null" ]; then
             SJC_BUY=$(echo "scale=1; $RAW_BUY / 1000000" | bc)
             SJC_SELL=$(echo "scale=1; $RAW_SELL / 1000000" | bc)
           else
-            SJC_BUY="Đang cập nhật"
-            SJC_SELL="Đang cập nhật"
+            SJC_BUY="---"
+            SJC_SELL="---"
           fi
 
-          # 4. Lấy thời gian VN (+7) kèm số giây để ép Git Push
+          # 4. Lấy thời gian VN (+7) kèm số giây để ép Git Push bản mới
           UPDATED_AT=$(date -d '+7 hours' +'%d/%m/%Y %H:%M:%S')
 
-          # 5. Ghi file data.json đúng cấu trúc script.js cần
+          # 5. Ghi file data.json
           echo "{\"sjc_buy\": \"$SJC_BUY\", \"sjc_sell\": \"$SJC_SELL\", \"updated_at\": \"$UPDATED_AT\"}" > data.json
           
-          echo "Nội dung file JSON thực tế:"
+          # In ra để bạn soi log trong tab Actions nếu vẫn lỗi
+          echo "Check file content:"
           cat data.json
 
       - name: Commit and Push
@@ -51,5 +51,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data.json
+          # Commit kèm mốc giây để nội dung luôn khác biệt
           git commit -m "Update Price: $(date -d '+7 hours' +'%H:%M:%S')" || exit 0
           git push origin HEAD
