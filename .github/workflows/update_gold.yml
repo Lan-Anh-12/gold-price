@@ -1,87 +1,50 @@
-name: Update Gold Price (vang.today)
+name: Update Gold Price
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Cho phép bấm nút chạy tay để test
   schedule:
-    - cron: '0 0 * * *'   # mỗi giờ
+    - cron: '0 * * * *' # Chạy mỗi giờ
 
 jobs:
   update-gold:
     runs-on: ubuntu-latest
-
     permissions:
       contents: write
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Fetch & compare SJC gold price
+      - name: Fetch Gold Price
         run: |
-          sudo apt-get update
-          sudo apt-get install -y jq curl
+          # Sử dụng User-Agent để tránh bị API chặn (giả lập trình duyệt)
+          RESPONSE=$(curl -s -H "User-Agent: Mozilla/5.0" "https://www.vang.today/api/prices?type=SJL1L10")
+          
+          # Lấy giá trị và bỏ dấu ngoặc kép, đảm bảo là số
+          BUY=$(echo "$RESPONSE" | jq -r '.data[0].buy // empty')
+          SELL=$(echo "$RESPONSE" | jq -r '.data[0].sell // empty')
 
-          TODAY_RESPONSE=$(curl -s "https://www.vang.today/api/prices?type=SJL1L10")
-          HISTORY_RESPONSE=$(curl -s "https://www.vang.today/api/prices?type=SJL1L10&days=2")
-
-          # Giá hôm nay
-          TODAY_BUY=$(echo "$TODAY_RESPONSE" | jq -r '.data[0].buy // empty')
-          TODAY_SELL=$(echo "$TODAY_RESPONSE" | jq -r '.data[0].sell // empty')
-
-          # Giá hôm qua (item cuối cùng)
-          YESTERDAY_BUY=$(echo "$HISTORY_RESPONSE" | jq -r '.data[-1].buy // empty')
-          YESTERDAY_SELL=$(echo "$HISTORY_RESPONSE" | jq -r '.data[-1].sell // empty')
-
-          # Nếu API lỗi → không commit
-          if [ -z "$TODAY_BUY" ] || [ -z "$YESTERDAY_BUY" ]; then
-            echo "❌ Failed to fetch gold price"
-            exit 0
+          if [ -z "$BUY" ]; then
+            echo "❌ API Error: Không lấy được dữ liệu"
+            exit 1 # Báo lỗi đỏ để bạn biết
           fi
 
-          # So sánh
-          BUY_DIFF=$((TODAY_BUY - YESTERDAY_BUY))
-          SELL_DIFF=$((TODAY_SELL - YESTERDAY_SELL))
+          # Chuyển sang đơn vị Triệu (ví dụ 89000000 -> 89.0)
+          BUY_TRIEU=$(echo "scale=1; $BUY / 1000000" | bc)
+          SELL_TRIEU=$(echo "scale=1; $SELL / 1000000" | bc)
 
-          if [ "$BUY_DIFF" -gt 0 ]; then
-            BUY_TREND="up"
-          elif [ "$BUY_DIFF" -lt 0 ]; then
-            BUY_TREND="down"
-          else
-            BUY_TREND="same"
-          fi
-
+          # Ghi đè file data.json theo đúng cấu trúc cũ của bạn
           cat <<EOF > data.json
           {
-            "type": "SJC",
-            "today": {
-              "buy": $TODAY_BUY,
-              "sell": $TODAY_SELL
-            },
-            "yesterday": {
-              "buy": $YESTERDAY_BUY,
-              "sell": $YESTERDAY_SELL
-            },
-            "change": {
-              "buy_diff": $BUY_DIFF,
-              "sell_diff": $SELL_DIFF,
-              "trend": "$BUY_TREND"
-            },
-            "updated_at": "$(date +'%d/%m/%Y %H:%M')"
+            "sjc_buy": "$BUY_TRIEU",
+            "sjc_sell": "$SELL_TRIEU",
+            "updated_at": "$(date -d '+7 hours' +'%d/%m/%Y %H:%M')"
           }
           EOF
 
-      - name: Commit and push if changed
+      - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
           git add data.json
-
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Update SJC gold price"
-            git push origin HEAD
-          fi
+          git commit -m "Update: $(date)" || exit 0 # Không có thay đổi thì thôi
+          git push
