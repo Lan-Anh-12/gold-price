@@ -1,15 +1,15 @@
 name: Update Gold Price (SJC)
 
 on:
-  workflow_dispatch: # Cho phép bấm nút "Run workflow" để kiểm tra ngay
+  workflow_dispatch: # Cho phép bạn bấm nút chạy tay để kiểm tra ngay
   schedule:
-    - cron: '0 * * * *'   # Chạy tự động vào phút thứ 0 của mỗi giờ
+    - cron: '0 * * * *'   # Chạy tự động mỗi giờ một lần
 
 jobs:
   update-gold:
     runs-on: ubuntu-latest
     
-    # Quan trọng: Cấp quyền ghi để Action có thể commit vào Repo của bạn
+    # BẮT BUỘC: Cấp quyền ghi để Action có thể lưu file vào kho code
     permissions:
       contents: write
 
@@ -17,42 +17,41 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Fetch Gold Price and Update Data
+      - name: Fetch and Force Update
         run: |
-          # 1. Gọi API lấy giá vàng (limit=1 để lấy bản mới nhất)
+          # 1. Lấy dữ liệu từ API
           RESPONSE=$(curl -s -H "User-Agent: Mozilla/5.0" "https://www.vang.today/api/prices?type=SJL1L10&limit=1")
           
-          # 2. Trích xuất giá bằng jq (nếu API lỗi sẽ lấy giá trị mặc định 0.0)
+          # 2. Trích xuất giá (Nếu API lỗi sẽ lấy giá trị mặc định để script không chết)
           BUY=$(echo "$RESPONSE" | jq -r '.data[0].buy // "0"')
           SELL=$(echo "$RESPONSE" | jq -r '.data[0].sell // "0"')
 
           # 3. Chuyển đổi sang đơn vị Triệu (89000000 -> 89.0)
-          # Dùng 'bc' để tính toán số thập phân
           SJC_BUY=$(echo "scale=1; $BUY / 1000000" | bc)
           SJC_SELL=$(echo "scale=1; $SELL / 1000000" | bc)
 
-          # 4. Lấy thời gian hiện tại (Múi giờ VN +7)
-          # Thêm %S (số giây) để đảm bảo file luôn khác biệt mỗi lần chạy
+          # 4. QUAN TRỌNG: Lấy thời gian VN (+7) kèm theo SỐ GIÂY (%S)
+          # Số giây thay đổi mỗi lần chạy sẽ giúp Git nhận diện đây là file mới hoàn toàn
           UPDATED_AT=$(date -d '+7 hours' +'%d/%m/%Y %H:%M:%S')
 
-          # 5. Ghi đè file data.json đúng cấu trúc bạn đang dùng
+          # 5. Ghi file data.json đúng cấu trúc sjc_buy, sjc_sell của bạn
           echo "{\"sjc_buy\": \"$SJC_BUY\", \"sjc_sell\": \"$SJC_SELL\", \"updated_at\": \"$UPDATED_AT\"}" > data.json
           
-          # In ra log để kiểm tra nếu có lỗi
-          echo "Nội dung file JSON mới:"
+          # In kết quả ra log để soi lỗi
           cat data.json
 
-      - name: Commit and Push changes
+      - name: Commit and Push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
           git add data.json
           
-          # Kiểm tra xem có sự thay đổi thực sự không (nhờ có giây nên chắc chắn sẽ có)
+          # Commit kèm theo timestamp chi tiết
+          # Lệnh git diff sẽ thấy file khác biệt (do có số giây mới) và cho phép commit
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Auto Update Gold Price: $(date -d '+7 hours' +'%Y-%m-%d %H:%M:%S')"
+            git commit -m "Auto Update: $(date -d '+7 hours' +'%Y-%m-%d %H:%M:%S')"
             git push origin HEAD
           fi
